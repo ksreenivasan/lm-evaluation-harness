@@ -13,6 +13,9 @@ from lm_eval.api.registry import register_model
 from lm_eval.models.utils import retry_on_specific_exceptions
 from lm_eval.utils import eval_logger
 
+# TODO: @ks: just writing a dummy completions script so I can scrape prompts and responses
+# that way we can do generations offline
+# and then just score it.
 
 def get_result(response, ctxlen: int) -> Tuple[float, bool]:
     """Process results from OpenAI API response.
@@ -74,7 +77,7 @@ def oa_completion(client, chat: bool = False, **kwargs):
     return completion()
 
 
-@register_model("openai-completions", "local-completions")
+@register_model("openai-dummy-completions", "local-dummy-completions")
 class OpenaiCompletionsLM(TemplateLM):
     _DEFAULT_MAX_LENGTH = 2048
 
@@ -146,6 +149,10 @@ class OpenaiCompletionsLM(TemplateLM):
             self.client = openai.OpenAI(base_url=self.base_url)
         else:
             self.client = openai.OpenAI()
+
+        # TODO: @ks: using a list to store all the inputs that eleuther wants to prompt the model with
+        self.inputs = []
+        self.cached_response = None # dummy response
 
     @property
     def eot_token_id(self):
@@ -268,7 +275,7 @@ class OpenaiCompletionsLM(TemplateLM):
                 inp = context_enc[-(self.max_length - self.max_gen_toks) :]
                 inps.append(inp)
 
-            # @KS TODO: this may cause issues with some apis
+            # @KS TODO: just comment until for now. handle more carefully later.
             until = request_args.get("until", ["<|endoftext|>"])
             request_args["temperature"] = request_args.get("temperature", 0)
 
@@ -344,7 +351,7 @@ class OpenaiCompletionsLM(TemplateLM):
         return loglikelihoods
 
 
-@register_model("openai-chat-completions", "local-chat-completions")
+@register_model("openai-dummy-chat-completions", "local-dummy-chat-completions")
 class OpenaiChatCompletionsLM(LM):
     def __init__(
         self,
@@ -379,10 +386,13 @@ class OpenaiChatCompletionsLM(LM):
         # Read from environment variable OPENAI_API_KEY
         # Set to EMPTY for local
         if self.base_url:
-            # @KS TODO: this seems to be needed while hitting our apis. maybe I can just ask it to use openai api key?
-            self.client = openai.OpenAI(base_url=self.base_url, api_key=os.environ["MCLI_API_KEY"])
+            self.client = openai.OpenAI(base_url=self.base_url, api_key=os.environ['MCLI_API_KEY'])
         else:
             self.client = openai.OpenAI()  # openai.AsyncOpenAI()
+
+        # TODO: @ks: using a list to store all the inputs that eleuther wants to prompt the model with
+        self.inputs = []
+        self.cached_response = None # dummy response
 
     @property
     def max_length(self) -> int:
@@ -446,14 +456,26 @@ class OpenaiChatCompletionsLM(LM):
                     raise ValueError(
                         f"Expected repr(kwargs) to be of type repr(dict) but got {kwargs}"
                     )
+                # import ipdb; ipdb.set_trace()
+                self.inputs += inps
 
-                response = oa_completion(
-                    client=self.client,
-                    chat=True,
-                    messages=inps,
-                    model=self.model,
-                    **kwargs,
-                )
+                # just skip this and return the same dummy response.
+                
+
+                if len(self.inputs) > 1:
+                    print("Kartik and Eitan are madlads. Skipping the actual API call and returning dummy response.")
+                    response = self.cached_response
+                else:
+                    response = oa_completion(
+                        client=self.client,
+                        chat=True,
+                        messages=inps,
+                        model=self.model,
+                        **kwargs,
+                    )
+                    response.choices[0].message.content = "These are not the droids you're looking for. The answer is 42."
+                    self.cached_response = response
+                
 
                 for resp, (context, args_) in zip(response.choices, chunk):
                     s = resp.message.content
@@ -473,6 +495,11 @@ class OpenaiChatCompletionsLM(LM):
             res[key] = re_ord.get_original(res[key])
 
         pbar.close()
+        # write list to file
+        # NOTE: @ks: this will get overwritten every time we run the harness
+        import json
+        with open('lm_eval_harness_gsm8k_cot_prompts.json', 'w') as f:
+            json.dump(self.inputs, f)
 
         return grouper.get_original(res)
 

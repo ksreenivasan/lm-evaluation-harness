@@ -6,6 +6,7 @@ from . import (
     mamba_lm,
     neuron_optimum,
     openai_completions,
+    dummy_completions,
     optimum_lm,
     textsynth,
     vllm_causallms,
