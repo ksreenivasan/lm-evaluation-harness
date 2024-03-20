@@ -358,6 +358,10 @@ def evaluate(
 
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
+
+    SAVE_PROBLEM_LIST = True
+    cached_response = None
+    problem_list = []
     for reqtype, reqs in requests.items():
         eval_logger.info(f"Running {reqtype} requests")
         # create `K` copies of each request `req` based off `K = req.repeats`
@@ -369,9 +373,31 @@ def evaluate(
             for _ in range(padding_requests[reqtype]):
                 cloned_reqs.extend([req] * req.repeats)
 
+        # import ipdb; ipdb.set_trace()
         # run requests through model
-        resps = getattr(lm, reqtype)(cloned_reqs)
+        # @KS: TODO: this is where the model is called.
+        # This is also probably where I will stick my logic for putting the generations back in.
+        if SAVE_PROBLEM_LIST:
+            print("Skipping model call for now, so I can extract prompts, answers, etc.")
+            if cached_response is None:
+                dummy_response = getattr(lm, reqtype)(cloned_reqs[0:1])
+                resps = [dummy_response[0] for _ in cloned_reqs]
 
+            else:
+                resps = cached_response
+        else:
+            resps = getattr(lm, reqtype)(cloned_reqs)
+
+        if SAVE_PROBLEM_LIST:
+            for req in cloned_reqs:
+                problem = {'prompt': req.args[0], 'doc': req.doc, 'doc_id': req.doc_id,
+                        'filtered_resps': req.filtered_resps, 'resps': req.resps,
+                        'idx': req.idx, 'metadata': req.metadata,
+                        'request_type': req.request_type, 'repeats': req.repeats,
+                        'task_name': req.task_name}
+                problem_list.append(problem)
+
+        # import ipdb; ipdb.set_trace()
         # put responses from model into a list of length K for each request.
         for x, req in zip(resps, cloned_reqs):
             req.resps.append(x)
@@ -379,12 +405,17 @@ def evaluate(
         if lm.world_size > 1:
             lm.accelerator.wait_for_everyone()
 
+    if SAVE_PROBLEM_LIST:
+        import json
+        with open(f'lm_eval_harness_{problem_list[0]['task_name']}_problem_list.json', 'w') as f:
+            json.dump(problem_list, f)
     RANK = lm.rank
     WORLD_SIZE = lm.world_size
     ### Postprocess outputs ###
     # TODO: del model here, maybe (idea: allow user to specify device of e.g. reward model separately)
     for task_output in eval_tasks:
         task = task_output.task
+        # import ipdb; ipdb.set_trace()
         task.apply_filters()
 
         ### Collect values of metrics on all datapoints ###
@@ -398,6 +429,8 @@ def evaluate(
         for instances in instances_by_doc_id.values():
             instances.sort(key=lambda x: x.idx)
         # iterate over different filters used
+        # @ks: NOTE: filter_key is strict-match and flexible-extract. The solution computation is already done at this stage.
+        # import ipdb; ipdb.set_trace()
         for filter_key in task.instances[0].filtered_resps.keys():
             doc_iterator = task.doc_iterator(
                 rank=RANK, limit=limit, world_size=WORLD_SIZE
@@ -454,7 +487,7 @@ def evaluate(
                     task_output.sample_metrics[metrics] = list(
                         itertools.chain.from_iterable(metric_list)
                     )
-
+    # import ipdb; ipdb.set_trace()
     if RANK == 0:
         ### Aggregate results over all datapoints ###
         # aggregate results ; run bootstrap CIs
