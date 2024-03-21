@@ -55,6 +55,12 @@ def simple_evaluate(
     random_seed: int = 0,
     numpy_random_seed: int = 1234,
     torch_random_seed: int = 1234,
+    save_problem_list: Optional[bool] = False,
+    score_generations: Optional[bool] = False,
+    kartik_debug_mode: Optional[bool] = False,
+    kartik_mode: Optional[str] = None,
+    kartik_temperature: Optional[float] = 0.0,
+    kartik_model_name: Optional[str] = None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -241,6 +247,12 @@ def simple_evaluate(
         write_out=write_out,
         log_samples=log_samples,
         verbosity=verbosity,
+        save_problem_list=save_problem_list,
+        score_generations=score_generations,
+        kartik_debug_mode=kartik_debug_mode,
+        kartik_mode=kartik_mode,
+        kartik_temperature=kartik_temperature,
+        kartik_model_name=kartik_model_name,
     )
 
     if lm.rank == 0:
@@ -284,6 +296,12 @@ def evaluate(
     write_out: bool = False,
     log_samples: bool = True,
     verbosity: str = "INFO",
+    save_problem_list: Optional[bool] = False,
+    score_generations: Optional[bool] = False,
+    kartik_debug_mode: Optional[bool] = False,
+    kartik_mode: Optional[str] = None,
+    kartik_temperature: Optional[float] = 0.0,
+    kartik_model_name: Optional[str] = None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -360,8 +378,11 @@ def evaluate(
     # execute each type of request
 
     # @KS: NOTE: Use these flags to decide which mode to run lm-eval-harness in.
-    SAVE_PROBLEM_LIST = False
-    SCORE_GENERATIONS = True
+    SAVE_PROBLEM_LIST = save_problem_list
+    SCORE_GENERATIONS = score_generations
+    # TODO: check kartik args DONE
+    # print("TODO: check kartik args here before running anything else.")
+    # import ipdb; ipdb.set_trace()
     import json
 
     if SAVE_PROBLEM_LIST:
@@ -412,22 +433,24 @@ def evaluate(
                         'request_type': req.request_type, 'repeats': req.repeats,
                         'task_name': req.task_name}
                 problem_list.append(problem)
-
         # import ipdb; ipdb.set_trace()
         # put responses from model into a list of length K for each request.
 
         if SCORE_GENERATIONS:
             # read generations file and fill in resps with them
-            temperature = 0.0
-            debug_mode_str = 'debug_'
-            mode = 'completion'
-            model = 'mixtral-instruct'
+            # temperature = 0.0
+            # mode = 'completion'
+            # model = 'mixtral-instruct'
             task_id = cloned_reqs[0].task_name
-            generations_file = f'{task_id}_outputs/{debug_mode_str}{model}_{mode}_temp{temperature}.jsonl'
-            generations_file = f'gsm8k_outputs/debug_mixtral-instruct_completion_temp0.0.jsonl'
+
+            debug_mode_str = 'debug_' if kartik_debug_mode else ''
+            generations_file = f'{task_id}_outputs/{debug_mode_str}{kartik_model_name}_{kartik_mode}_temp{kartik_temperature}.jsonl'
+            # generations_file = f'gsm8k_outputs/debug_mixtral-instruct_completion_temp0.0.jsonl'
             print(f'Gonna fill in the responses from {generations_file}.')
             with open(generations_file) as f:
                 stored_generations = [json.loads(line) for line in f]
+
+            # TODO: extract model name from stored_generations here and update it wherever it's used in the code
 
             def apply_generate_until_filter(stored_generations):
                 generate_until_keywords = task.config.generation_kwargs['until']
@@ -446,6 +469,7 @@ def evaluate(
             processed_generations = apply_generate_until_filter(stored_generations)
 
             # this will only work if the order of the generations is the same as the order of the requests I saw earlier. fingers crossed
+            # import ipdb; ipdb.set_trace()
             for idx, req in enumerate(cloned_reqs):
                 if req.arguments[0] == processed_generations[idx]['prompt']:
                     resps[idx] = processed_generations[idx]['processed_completion']
@@ -638,6 +662,16 @@ def evaluate(
             "versions": dict(sorted(versions.items())),
             "n-shot": dict(sorted(num_fewshot.items())),
         }
+
+        # TODO: @ks: I think I can stick model in here
+        # import ipdb; ipdb.set_trace()
+        results_dict["kartik_metadata"] = {'kartik_model_name': kartik_model_name,
+                                           'kartik_debug_mode': kartik_debug_mode,
+                                           'kartik_mode': kartik_mode,
+                                           'kartik_temperature': kartik_temperature,
+                                           'save_problem_list': save_problem_list,
+                                           'score_generations': score_generations
+                                        }
         if log_samples:
             results_dict["samples"] = dict(samples)
 

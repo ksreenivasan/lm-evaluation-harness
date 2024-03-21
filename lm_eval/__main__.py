@@ -228,6 +228,42 @@ def setup_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
     )
+    parser.add_argument(
+        "--save_problem_list",
+        action="store_true",
+        default=False,
+        help="Kartik: Running eval in SAVE_PROBLEM_LIST mode. Will just run through gsm8k and construct prompts.",
+    )
+    parser.add_argument(
+        "--score_generations",
+        action="store_true",
+        default=False,
+        help="Kartik: Running eval in SAVE_PROBLEM_LIST mode. Will just run through gsm8k and construct prompts.",
+    )
+    parser.add_argument(
+        "--kartik_debug_mode",
+        action="store_true",
+        default=False,
+        help="Kartik: Running eval in debug mode with just 100 generations.",
+    )
+    parser.add_argument(
+        "--kartik_mode",
+        type=str,
+        default="completion",
+        help="This is just needed to figure out the generations file name.",
+    )
+    parser.add_argument(
+        "--kartik_temperature",
+        type=str,
+        default="0.0",
+        help="This is just needed to figure out the generations file name.",
+    )
+    parser.add_argument(
+        "--kartik_model_name",
+        type=str,
+        default="mixtral-instruct",
+        help="This is just needed to figure out the generations file name.",
+    )
 
     return parser
 
@@ -359,6 +395,12 @@ def cli_evaluate(args: Union[argparse.Namespace, None] = None) -> None:
         random_seed=args.seed[0],
         numpy_random_seed=args.seed[1],
         torch_random_seed=args.seed[2],
+        save_problem_list=args.save_problem_list,
+        score_generations=args.score_generations,
+        kartik_debug_mode=args.kartik_debug_mode,
+        kartik_mode=args.kartik_mode,
+        kartik_temperature=args.kartik_temperature,
+        kartik_model_name=args.kartik_model_name,
         **request_caching_args,
     )
 
@@ -404,6 +446,10 @@ def cli_evaluate(args: Union[argparse.Namespace, None] = None) -> None:
             f"{args.model} ({args.model_args}), gen_kwargs: ({args.gen_kwargs}), limit: {args.limit}, num_fewshot: {args.num_fewshot}, "
             f"batch_size: {args.batch_size}{f' ({batch_sizes})' if batch_sizes else ''}"
         )
+        if args.save_problem_list or args.score_generations:
+            print("Kartik: Running eval in CUSTOM mode.")
+            print(f"Kartik Metadata: {results.get('kartik_metadata', {})}")
+
         print(make_table(results))
         if "groups" in results:
             print(make_table(results, "groups"))
