@@ -359,7 +359,23 @@ def evaluate(
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
 
-    SAVE_PROBLEM_LIST = True
+    # @KS: NOTE: Use these flags to decide which mode to run lm-eval-harness in.
+    SAVE_PROBLEM_LIST = False
+    SCORE_GENERATIONS = True
+    import json
+
+    if SAVE_PROBLEM_LIST:
+        print("-"*200)
+        print("Kartik: Running eval in SAVE_PROBLEM_LIST mode. Will just run through gsm8k and construct prompts.")
+        print("-"*200)
+    elif SCORE_GENERATIONS:
+        print("-"*200)
+        print("Kartik: Running eval in SCORE_GENERATIONS mode. Will use stored generations and score them.")
+        print("-"*200)
+    else:
+        print("-"*200)
+        print("Kartik: Running eval in regular mode. Default lm-eval-harness behavior.")
+        print("-"*200)
     cached_response = None
     problem_list = []
     for reqtype, reqs in requests.items():
@@ -377,12 +393,12 @@ def evaluate(
         # run requests through model
         # @KS: TODO: this is where the model is called.
         # This is also probably where I will stick my logic for putting the generations back in.
-        if SAVE_PROBLEM_LIST:
+        if SAVE_PROBLEM_LIST or SCORE_GENERATIONS:
             print("Skipping model call for now, so I can extract prompts, answers, etc.")
             if cached_response is None:
                 dummy_response = getattr(lm, reqtype)(cloned_reqs[0:1])
                 resps = [dummy_response[0] for _ in cloned_reqs]
-
+                cached_response = resps
             else:
                 resps = cached_response
         else:
@@ -399,16 +415,56 @@ def evaluate(
 
         # import ipdb; ipdb.set_trace()
         # put responses from model into a list of length K for each request.
+
+        if SCORE_GENERATIONS:
+            # read generations file and fill in resps with them
+            temperature = 0.0
+            debug_mode_str = 'debug_'
+            mode = 'completion'
+            model = 'mixtral-instruct'
+            task_id = cloned_reqs[0].task_name
+            generations_file = f'{task_id}_outputs/{debug_mode_str}{model}_{mode}_temp{temperature}.jsonl'
+            generations_file = f'gsm8k_outputs/debug_mixtral-instruct_completion_temp0.0.jsonl'
+            print(f'Gonna fill in the responses from {generations_file}.')
+            with open(generations_file) as f:
+                stored_generations = [json.loads(line) for line in f]
+
+            def apply_generate_until_filter(stored_generations):
+                generate_until_keywords = task.config.generation_kwargs['until']
+                for generation in stored_generations:
+                    response = generation['completion']
+                    stop_idxs = [response.find(keyword) for keyword in generate_until_keywords]
+                    # remove -1s
+                    stop_idxs = [x for x in stop_idxs if x > 0]
+                    if len(stop_idxs) > 0 and min(stop_idxs) > 0:
+                        # trim to first stop_idx
+                        response = response[:min(stop_idxs)].strip()
+                    generation['processed_completion'] = response
+                return stored_generations
+
+            # apply generation_until functionality
+            processed_generations = apply_generate_until_filter(stored_generations)
+
+            # this will only work if the order of the generations is the same as the order of the requests I saw earlier. fingers crossed
+            for idx, req in enumerate(cloned_reqs):
+                if req.arguments[0] == processed_generations[idx]['prompt']:
+                    resps[idx] = processed_generations[idx]['processed_completion']
+                else:
+                    raise ValueError(f"Prompt mismatch at {idx}. Something went wrong.")
+                    print(f"Prompt mismatch at {idx}. Something went wrong.")
+                    resps[idx] = 'Kartik ERROR: Something went wrong with my script. Prompt mismatch, so I lost the completion.'
+
         for x, req in zip(resps, cloned_reqs):
             req.resps.append(x)
+        # import ipdb; ipdb.set_trace()
 
         if lm.world_size > 1:
             lm.accelerator.wait_for_everyone()
 
     if SAVE_PROBLEM_LIST:
-        import json
         with open(f'lm_eval_harness_{problem_list[0]['task_name']}_problem_list.json', 'w') as f:
             json.dump(problem_list, f)
+
     RANK = lm.rank
     WORLD_SIZE = lm.world_size
     ### Postprocess outputs ###
