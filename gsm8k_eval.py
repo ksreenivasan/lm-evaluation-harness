@@ -26,18 +26,33 @@ def read_gsm8k_problems(task_id='gsm8k_cot'):
         return json.load(f)
 
 
-def format_instruction(prompt):
-    return (
-        "Please generate code to complete the following problem wrapped in a Python markdown block:"
-        f"\n```python\n{prompt.strip()}\n```\n"
-    )
+def format_instruction(prompt, option=None):
+    if option is None:
+        # default behavior is Jose's human-eval prompt
+        formatted_prompt = (
+            "Please generate code to complete the following problem wrapped in a Python markdown block:"
+            f"\n```python\n{prompt.strip()}\n```\n"
+        )
+    elif option == "gsm8k-cot-force-format-following":
+        formatted_prompt = (
+            "Please solve the final math problem in the list given below. Follow the format specified in the few-shot samples given before the final math problem. In particular, make sure that you end your solution with the statement 'The answer is <answer>.' where <answer> is the final answer."
+            f"\n\n{prompt.strip()}"
+        )
+    elif option == "gsm8k-force-format-following":
+        formatted_prompt = (
+            "Please solve the final math problem in the list given below. Follow the format specified in the few-shot samples given before the final math problem. In particular, make sure that you end your solution with '#### <answer>' on a newline where <answer> is the final answer."
+            f"\n\n{prompt.strip()}"
+        )
+    else:
+        raise ValueError(f"{option=} not supported")
+    return formatted_prompt
 
 
-def format_prompt(prompt: str, mode: str) -> str:
+def format_prompt(prompt: str, mode: str, option: Optional[str]) -> str:
     if mode == "completion":
         return prompt
-    elif mode == "instruction":
-        return format_instruction(prompt)
+    elif mode == "custom_instruction":
+        return format_instruction(prompt, option=option)
     else:
         raise ValueError(f"{mode=} not supported")
 
@@ -54,7 +69,7 @@ def generate(params):
 
 def main(
     model: str,
-    mode: str = 'completion', #Literal["completion", "instruction"],
+    mode: str = 'completion', #Literal["completion", "instruction", "custom_instruction"],
     temperature: float = 0.0,
     max_tokens: int = 512,
     generations_per_sample: int = 1,
@@ -67,15 +82,27 @@ def main(
     if debug_mode:
         problems = problems[:100]
 
+    # TODO: calculate option based on task_id and pass it to format_prompt
+    if mode == "custom_instruction":
+        # compute option based on task_id
+        if task_id == 'gsm8k_cot':
+            prompt_format_option = "gsm8k-cot-force-format-following"
+        elif task_id == 'gsm8k':
+            prompt_format_option = "gsm8k-force-format-following"
+        else:
+            raise ValueError(f"{task_id=} not supported in custom_instruction mode")
+    else:
+        prompt_format_option = None
     params = [
         {
             "task_id": task_id,
-            "prompt": format_prompt(problem["prompt"], mode=mode),
+            "prompt": format_prompt(problem["prompt"], mode=mode, option=prompt_format_option),
             "model": model,
             "generation_kwargs": {
                 "temperature": temperature,
                 "max_tokens": max_tokens,
             },
+            "prompt_prefix": format_prompt("", mode=mode, option=prompt_format_option),
         }
         for problem in problems
     ] * generations_per_sample
@@ -107,3 +134,4 @@ if __name__ == "__main__":
 ## Mixtral-instruct runs (once these are verified, I'll move to other APIs)
 # python gsm8k_eval.py 'mixtral-instruct' --task-id gsm8k_cot
 # python gsm8k_eval.py 'mixtral-instruct' --task-id gsm8k
+

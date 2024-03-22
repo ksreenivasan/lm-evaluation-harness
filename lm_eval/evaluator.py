@@ -445,13 +445,13 @@ def evaluate(
 
             debug_mode_str = 'debug_' if kartik_debug_mode else ''
             generations_file = f'{task_id}_outputs/{debug_mode_str}{kartik_model_name}_{kartik_mode}_temp{kartik_temperature}.jsonl'
+            # generations_file = f'{task_id}_outputs/200_max_tokens_{debug_mode_str}{kartik_model_name}_{kartik_mode}_temp{kartik_temperature}.jsonl'
             # generations_file = f'gsm8k_outputs/debug_mixtral-instruct_completion_temp0.0.jsonl'
             print(f'Gonna fill in the responses from {generations_file}.')
             with open(generations_file) as f:
                 stored_generations = [json.loads(line) for line in f]
 
-            # TODO: extract model name from stored_generations here and update it wherever it's used in the code
-
+            # extract model name from stored_generations here and update it wherever it's used in the code
             def apply_generate_until_filter(stored_generations):
                 generate_until_keywords = task.config.generation_kwargs['until']
                 for generation in stored_generations:
@@ -471,7 +471,13 @@ def evaluate(
             # this will only work if the order of the generations is the same as the order of the requests I saw earlier. fingers crossed
             # import ipdb; ipdb.set_trace()
             for idx, req in enumerate(cloned_reqs):
-                if req.arguments[0] == processed_generations[idx]['prompt']:
+                if kartik_mode == 'custom_instruction':
+                    # need to strip the prompt_prefix from the prompt
+                    prompt_without_prefix = processed_generations[idx]['prompt'].strip(processed_generations[idx]['prompt_prefix'])
+                else:
+                    prompt_without_prefix = processed_generations[idx]['prompt']
+
+                if req.arguments[0] == prompt_without_prefix:
                     resps[idx] = processed_generations[idx]['processed_completion']
                 else:
                     raise ValueError(f"Prompt mismatch at {idx}. Something went wrong.")
