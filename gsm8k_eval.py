@@ -34,8 +34,12 @@ def format_instruction(prompt, option=None):
             f"\n```python\n{prompt.strip()}\n```\n"
         )
     elif option == "gsm8k-cot-force-format-following":
+        # formatted_prompt = (
+        #     "Please solve the final math problem in the list given below. Follow the format specified in the few-shot samples given before the final math problem. In particular, make sure that you end your solution with the statement 'The answer is <answer>.' where <answer> is the final answer."
+        #     f"\n\n{prompt.strip()}"
+        # )
         formatted_prompt = (
-            "Please solve the final math problem in the list given below. Follow the format specified in the few-shot samples given before the final math problem. In particular, make sure that you end your solution with the statement 'The answer is <answer>.' where <answer> is the final answer."
+            "Below are 8 example math problems. Follow their format and answer the final problem below them. In particular, make sure that you end your solution with the statement 'The answer is <answer>.' where <answer> is the final answer."
             f"\n\n{prompt.strip()}"
         )
     elif option == "gsm8k-force-format-following":
@@ -58,6 +62,10 @@ def format_prompt(prompt: str, mode: str, option: Optional[str]) -> str:
 
 
 def generate(params):
+    # TODO: maybe i should try splitting the prompt into instruction and problem
+    # if params["mode"] == "custom_instruction":
+    #     # split prompt into instruction and problem
+    #     instruction, problem = params["prompt"].split("\n\n", 1)
     completion = api_generate(
         model=params["model"],
         prompt=params["prompt"],
@@ -103,6 +111,7 @@ def main(
                 "max_tokens": max_tokens,
             },
             "prompt_prefix": format_prompt("", mode=mode, option=prompt_format_option),
+            "mode": mode,
         }
         for problem in problems
     ] * generations_per_sample
