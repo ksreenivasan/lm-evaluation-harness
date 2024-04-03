@@ -78,7 +78,9 @@ def api_generate(model, prompt, tenacity=False, api_base=None, api_key=None, **k
         kwargs = kwargs | models[model] | {"messages": messages}
     else:
         if api_key is None:
-            api_key = mcli_key
+            api_key = mcli_key['api_key']
+        else:
+            api_key = os.environ.get(api_key)
         kwargs = kwargs | {'model': 'openai/_', 'api_base': api_base, 'api_key': api_key} | {"messages": messages}
 
     if kwargs.get('temperature', None) == 0.0 and '.mosaicml.' in kwargs.get('api_base', ''):
