@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import Literal, Optional
 from tqdm.auto import tqdm
-from kartik_api import api_generate
+# from kartik_api import api_generate
+from api_helper import api_generate
 
 from human_eval.data import read_problems
 
@@ -38,9 +39,15 @@ def format_instruction(prompt, option=None):
         #     "Please solve the final math problem in the list given below. Follow the format specified in the few-shot samples given before the final math problem. In particular, make sure that you end your solution with the statement 'The answer is <answer>.' where <answer> is the final answer."
         #     f"\n\n{prompt.strip()}"
         # )
+        # formatted_prompt = (
+        #     "Below are 8 example math problems followed by their solutions. Think carefully, step by step and answer the final problem."
+        #     f"\n\n{prompt.strip()}"
+        # )
+        # NOTE: trying to make it 0-shot
+        final_problem = prompt.split("\n\n")[-1]
         formatted_prompt = (
-            "Below are 8 example math problems. Follow their format and answer the final problem below them. In particular, make sure that you end your solution with the statement 'The answer is <answer>.' where <answer> is the final answer."
-            f"\n\n{prompt.strip()}"
+            "Below is a math problem. Think carefully, step by step and answer it. Make sure to end your solution with '<answer>' on a newline where <answer> is the final numeric answer."
+            f"\n\n{final_problem.strip()}"
         )
     elif option == "gsm8k-force-format-following":
         formatted_prompt = (

@@ -456,12 +456,16 @@ def evaluate(
                 generate_until_keywords = task.config.generation_kwargs['until']
                 for generation in stored_generations:
                     response = generation['completion']
-                    stop_idxs = [response.find(keyword) for keyword in generate_until_keywords]
-                    # remove -1s
-                    stop_idxs = [x for x in stop_idxs if x > 0]
-                    if len(stop_idxs) > 0 and min(stop_idxs) > 0:
-                        # trim to first stop_idx
-                        response = response[:min(stop_idxs)].strip()
+                    if response is not None:
+                        stop_idxs = [response.find(keyword) for keyword in generate_until_keywords]
+                        # remove -1s
+                        stop_idxs = [x for x in stop_idxs if x > 0]
+                        if len(stop_idxs) > 0 and min(stop_idxs) > 0:
+                            # trim to first stop_idx
+                            response = response[:min(stop_idxs)].strip()
+                    else:
+                        print("Warning: None response found in stored generations. This shouldn't have happened.")
+                        response = "None"
                     generation['processed_completion'] = response
                 return stored_generations
 
@@ -469,8 +473,11 @@ def evaluate(
             processed_generations = apply_generate_until_filter(stored_generations)
 
             # this will only work if the order of the generations is the same as the order of the requests I saw earlier. fingers crossed
-            # import ipdb; ipdb.set_trace()
             for idx, req in enumerate(cloned_reqs):
+                if kartik_debug_mode and idx >= len(processed_generations):
+                    print("Warning: Running in debug mode and ran out of stored generations.")
+                    break
+
                 if kartik_mode == 'custom_instruction':
                     # need to strip the prompt_prefix from the prompt
                     prompt_without_prefix = processed_generations[idx]['prompt'].strip(processed_generations[idx]['prompt_prefix'])
@@ -479,14 +486,16 @@ def evaluate(
 
                 if req.arguments[0] == prompt_without_prefix:
                     resps[idx] = processed_generations[idx]['processed_completion']
+                elif req.arguments[0].split("\n\n")[-1] == prompt_without_prefix:
+                    # specifically for the 0-shot prompting that I'm trying out
+                    resps[idx] = processed_generations[idx]['processed_completion']
                 else:
-                    raise ValueError(f"Prompt mismatch at {idx}. Something went wrong.")
                     print(f"Prompt mismatch at {idx}. Something went wrong.")
                     resps[idx] = 'Kartik ERROR: Something went wrong with my script. Prompt mismatch, so I lost the completion.'
+                    raise ValueError(f"Prompt mismatch at {idx}. Something went wrong.")
 
         for x, req in zip(resps, cloned_reqs):
             req.resps.append(x)
-        # import ipdb; ipdb.set_trace()
 
         if lm.world_size > 1:
             lm.accelerator.wait_for_everyone()
