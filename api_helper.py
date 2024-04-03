@@ -72,7 +72,7 @@ models = {
 }
 
 
-def api_generate(model, prompt, tenacity=False, **kwargs):
+def api_generate(model, prompt, tenacity=False, endpoint=None, **kwargs):
     messages = [{"role": "user", "content": prompt}]
     kwargs = kwargs | models[model] | {"messages": messages}
 

@@ -501,7 +501,7 @@ def evaluate(
             lm.accelerator.wait_for_everyone()
 
     if SAVE_PROBLEM_LIST:
-        with open(f'lm_eval_harness_{problem_list[0]['task_name']}_problem_list.json', 'w') as f:
+        with open(f'lm_eval_harness_{problem_list[0]["task_name"]}_problem_list.json', 'w') as f:
             json.dump(problem_list, f)
 
     RANK = lm.rank

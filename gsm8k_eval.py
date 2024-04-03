@@ -75,6 +75,7 @@ def generate(params):
         model=params["model"],
         prompt=params["prompt"],
         tenacity=False,
+        endpoint=params["endpoint"]
         **params.get("generation_kwargs", {}),
     )
     return params | {"completion": completion}
@@ -90,6 +91,7 @@ def main(
     workers: int = 5,
     task_id: str = 'gsm8k_cot',
     debug_mode: Optional[bool] = None,
+    endpoint: Optional[str] = None, # if you want to explicitly specify the api endpoint
 ):
     problems = read_gsm8k_problems(task_id=task_id)
     if debug_mode:
@@ -117,6 +119,7 @@ def main(
             },
             "prompt_prefix": format_prompt("", mode=mode, option=prompt_format_option),
             "mode": mode,
+            "endpoint": endpoint,
         }
         for problem in problems
     ] * generations_per_sample
