@@ -417,7 +417,9 @@ def evaluate(
         if SAVE_PROBLEM_LIST or SCORE_GENERATIONS:
             print("Skipping model call for now, so I can extract prompts, answers, etc.")
             if cached_response is None:
-                dummy_response = getattr(lm, reqtype)(cloned_reqs[0:1])
+                # dummy_response = getattr(lm, reqtype)(cloned_reqs[0:1])
+                dummy_response = ["Douglas Adams was right.\nThe answer is 42."]
+                # import ipdb; ipdb.set_trace()
                 resps = [dummy_response[0] for _ in cloned_reqs]
                 cached_response = resps
             else:
