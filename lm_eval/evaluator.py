@@ -57,10 +57,10 @@ def simple_evaluate(
     torch_random_seed: int = 1234,
     save_problem_list: Optional[bool] = False,
     score_generations: Optional[bool] = False,
-    kartik_debug_mode: Optional[bool] = False,
-    kartik_mode: Optional[str] = None,
-    kartik_temperature: Optional[float] = 0.0,
-    kartik_model_name: Optional[str] = None,
+    custom_eval_debug_mode: Optional[bool] = False,
+    custom_eval_mode: Optional[str] = None,
+    custom_eval_temperature: Optional[float] = 0.0,
+    custom_eval_model_name: Optional[str] = None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -249,10 +249,10 @@ def simple_evaluate(
         verbosity=verbosity,
         save_problem_list=save_problem_list,
         score_generations=score_generations,
-        kartik_debug_mode=kartik_debug_mode,
-        kartik_mode=kartik_mode,
-        kartik_temperature=kartik_temperature,
-        kartik_model_name=kartik_model_name,
+        custom_eval_debug_mode=custom_eval_debug_mode,
+        custom_eval_mode=custom_eval_mode,
+        custom_eval_temperature=custom_eval_temperature,
+        custom_eval_model_name=custom_eval_model_name,
     )
 
     if lm.rank == 0:
@@ -298,10 +298,10 @@ def evaluate(
     verbosity: str = "INFO",
     save_problem_list: Optional[bool] = False,
     score_generations: Optional[bool] = False,
-    kartik_debug_mode: Optional[bool] = False,
-    kartik_mode: Optional[str] = None,
-    kartik_temperature: Optional[float] = 0.0,
-    kartik_model_name: Optional[str] = None,
+    custom_eval_debug_mode: Optional[bool] = False,
+    custom_eval_mode: Optional[str] = None,
+    custom_eval_temperature: Optional[float] = 0.0,
+    custom_eval_model_name: Optional[str] = None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -443,9 +443,9 @@ def evaluate(
             # model = 'mixtral-instruct'
             task_id = cloned_reqs[0].task_name
 
-            debug_mode_str = 'debug_' if kartik_debug_mode else ''
-            generations_file = f'{task_id}_outputs/{debug_mode_str}{kartik_model_name}_{kartik_mode}_temp{kartik_temperature}.jsonl'
-            # generations_file = f'{task_id}_outputs/200_max_tokens_{debug_mode_str}{kartik_model_name}_{kartik_mode}_temp{kartik_temperature}.jsonl'
+            debug_mode_str = 'debug_' if custom_eval_debug_mode else ''
+            generations_file = f'{task_id}_outputs/{debug_mode_str}{custom_eval_model_name}_{custom_eval_mode}_temp{custom_eval_temperature}.jsonl'
+            # generations_file = f'{task_id}_outputs/200_max_tokens_{debug_mode_str}{custom_eval_model_name}_{custom_eval_mode}_temp{custom_eval_temperature}.jsonl'
             # generations_file = f'gsm8k_outputs/debug_mixtral-instruct_completion_temp0.0.jsonl'
             print(f'Gonna fill in the responses from {generations_file}.')
             with open(generations_file) as f:
@@ -474,11 +474,11 @@ def evaluate(
 
             # this will only work if the order of the generations is the same as the order of the requests I saw earlier. fingers crossed
             for idx, req in enumerate(cloned_reqs):
-                if kartik_debug_mode and idx >= len(processed_generations):
+                if custom_eval_debug_mode and idx >= len(processed_generations):
                     print("Warning: Running in debug mode and ran out of stored generations.")
                     break
 
-                if kartik_mode == 'custom_instruction':
+                if custom_eval_mode == 'custom_instruction':
                     # need to strip the prompt_prefix from the prompt
                     prompt_without_prefix = processed_generations[idx]['prompt'].strip(processed_generations[idx]['prompt_prefix'])
                 else:
@@ -680,10 +680,10 @@ def evaluate(
 
         # TODO: @ks: I think I can stick model in here
         # import ipdb; ipdb.set_trace()
-        results_dict["kartik_metadata"] = {'kartik_model_name': kartik_model_name,
-                                           'kartik_debug_mode': kartik_debug_mode,
-                                           'kartik_mode': kartik_mode,
-                                           'kartik_temperature': kartik_temperature,
+        results_dict["custom_eval_metadata"] = {'custom_eval_model_name': custom_eval_model_name,
+                                           'custom_eval_debug_mode': custom_eval_debug_mode,
+                                           'custom_eval_mode': custom_eval_mode,
+                                           'custom_eval_temperature': custom_eval_temperature,
                                            'save_problem_list': save_problem_list,
                                            'score_generations': score_generations
                                         }

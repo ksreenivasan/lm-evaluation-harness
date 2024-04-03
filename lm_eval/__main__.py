@@ -241,25 +241,25 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Kartik: Running eval in SAVE_PROBLEM_LIST mode. Will just run through gsm8k and construct prompts.",
     )
     parser.add_argument(
-        "--kartik_debug_mode",
+        "--custom_eval_debug_mode",
         action="store_true",
         default=False,
         help="Kartik: Running eval in debug mode with just 100 generations.",
     )
     parser.add_argument(
-        "--kartik_mode",
+        "--custom_eval_mode",
         type=str,
         default="completion",
         help="This is just needed to figure out the generations file name.",
     )
     parser.add_argument(
-        "--kartik_temperature",
+        "--custom_eval_temperature",
         type=str,
         default="0.0",
         help="This is just needed to figure out the generations file name.",
     )
     parser.add_argument(
-        "--kartik_model_name",
+        "--custom_eval_model_name",
         type=str,
         default="mixtral-instruct",
         help="This is just needed to figure out the generations file name.",
@@ -397,10 +397,10 @@ def cli_evaluate(args: Union[argparse.Namespace, None] = None) -> None:
         torch_random_seed=args.seed[2],
         save_problem_list=args.save_problem_list,
         score_generations=args.score_generations,
-        kartik_debug_mode=args.kartik_debug_mode,
-        kartik_mode=args.kartik_mode,
-        kartik_temperature=args.kartik_temperature,
-        kartik_model_name=args.kartik_model_name,
+        custom_eval_debug_mode=args.custom_eval_debug_mode,
+        custom_eval_mode=args.custom_eval_mode,
+        custom_eval_temperature=args.custom_eval_temperature,
+        custom_eval_model_name=args.custom_eval_model_name,
         **request_caching_args,
     )
 
@@ -448,7 +448,7 @@ def cli_evaluate(args: Union[argparse.Namespace, None] = None) -> None:
         )
         if args.save_problem_list or args.score_generations:
             print("Kartik: Running eval in CUSTOM mode.")
-            print(f"Kartik Metadata: {results.get('kartik_metadata', {})}")
+            print(f"Custom Eval Metadata: {results.get('custom_eval_metadata', {})}")
 
         print(make_table(results))
         if "groups" in results:
