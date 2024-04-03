@@ -379,8 +379,11 @@ class OpenaiChatCompletionsLM(LM):
         # Read from environment variable OPENAI_API_KEY
         # Set to EMPTY for local
         if self.base_url:
-            # @KS TODO: this seems to be needed while hitting our apis. maybe I can just ask it to use openai api key?
-            self.client = openai.OpenAI(base_url=self.base_url, api_key=os.environ["MCLI_API_KEY"])
+            if '.mosaicml' in self.base_url:
+                # @KS TODO: this seems to be needed while hitting our apis. maybe I can just ask it to use openai api key?
+                self.client = openai.OpenAI(base_url=self.base_url, api_key=os.environ["MCLI_API_KEY"])
+            else:
+                self.client = openai.OpenAI(base_url=self.base_url)
         else:
             self.client = openai.OpenAI()  # openai.AsyncOpenAI()
 
