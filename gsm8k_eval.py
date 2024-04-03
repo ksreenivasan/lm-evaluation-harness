@@ -75,7 +75,8 @@ def generate(params):
         model=params["model"],
         prompt=params["prompt"],
         tenacity=False,
-        endpoint=params["api_base"],
+        api_base=params["api_base"],
+        api_key=params["api_key"],
         **params.get("generation_kwargs", {}),
     )
     return params | {"completion": completion}
