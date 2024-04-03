@@ -4,8 +4,6 @@ from tqdm.auto import tqdm
 # from kartik_api import api_generate
 from api_helper import api_generate
 
-from human_eval.data import read_problems
-
 from concurrent.futures import ThreadPoolExecutor
 
 from tqdm.auto import tqdm
