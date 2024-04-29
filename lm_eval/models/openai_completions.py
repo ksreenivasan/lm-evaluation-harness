@@ -383,7 +383,9 @@ class OpenaiChatCompletionsLM(LM):
                 # @KS TODO: this seems to be needed while hitting our apis. maybe I can just ask it to use openai api key?
                 self.client = openai.OpenAI(base_url=self.base_url, api_key=os.environ["MCLI_API_KEY"])
             else:
-                self.client = openai.OpenAI(base_url=self.base_url)
+                print("Assuming base_url is set because you are using local-chat-completions.")
+                print("Setting api_key=dummy")
+                self.client = openai.OpenAI(base_url=self.base_url, api_key="dummy")
         else:
             self.client = openai.OpenAI()  # openai.AsyncOpenAI()
 
