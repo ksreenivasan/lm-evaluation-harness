@@ -69,6 +69,12 @@ models = {
         "api_base": 'https://e2-dogfood.staging.cloud.databricks.com/serving-endpoints',
         **db_key,
     },
+    "mixtral-8x22b": {
+        'api_base': 'https://77b7-164-152-107-143.ngrok-free.app/v1',
+        'api_key': 'key',
+        'ngrok': True,
+        'model': "mistralai/Mixtral-8x22B-Instruct-v0.1",
+    },
 }
 
 
@@ -99,8 +105,8 @@ def api_generate(model, prompt, tenacity=False, api_base=None, api_key=None, **k
             api_key=kwargs['api_key'],
         )
         response = client.chat.completions.create(
-            model=kwargs['model'],
-            messages=messages
+                model=kwargs['model'],
+                messages=messages
         )
     else:
         try:
