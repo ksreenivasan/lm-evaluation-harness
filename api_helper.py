@@ -1,5 +1,7 @@
 import os
 
+# @deprecated. litellm changed and broke some things
+from openai import OpenAI
 from litellm import completion
 from tenacity import (retry, stop_after_attempt,  # for exponential backoff
                       wait_random_exponential)
@@ -9,21 +11,21 @@ def dep(name):
 
 
 
-os.environ |= {
-    # OpenAI
-    'OPENAI_API_KEY': 'MY_API_KEY',
-    # Mistral Large
-    'AZURE_MISTRAL_API_KEY': 'MY_API_KEY', # my key
-    'MISTRAL_API_KEY': 'MY_API_KEY', # jose's key
-    # Gemini 1.0
-    'GEMINI_API_KEY': 'MY_API_KEY',
-    # Anthropic
-    'ANTHROPIC_API_KEY': 'MY_API_KEY',
-    # MCLI
-    # 'MCLI_API_KEY': "MY_API_KEY",
-    # DATABRICKS
-    # 'DATABRICKS_API_KEY': "MY_API_KEY"
-}
+# os.environ |= {
+#     # OpenAI
+#     'OPENAI_API_KEY': 'MY_API_KEY',
+#     # Mistral Large
+#     'AZURE_MISTRAL_API_KEY': 'MY_API_KEY', # my key
+#     'MISTRAL_API_KEY': 'MY_API_KEY', # jose's key
+#     # Gemini 1.0
+#     'GEMINI_API_KEY': 'MY_API_KEY',
+#     # Anthropic
+#     'ANTHROPIC_API_KEY': 'MY_API_KEY',
+#     # MCLI
+#     # 'MCLI_API_KEY': "MY_API_KEY",
+#     # DATABRICKS
+#     # 'DATABRICKS_API_KEY': "MY_API_KEY"
+# }
 
 gemini_block_none = {
     "safety_settings": [
@@ -46,39 +48,95 @@ gemini_block_none = {
     ]
 }
 
-mcli_key = {"api_key": os.environ.get("MCLI_API_KEY")}
-db_key = {'api_key': os.environ.get('DATABRICKS_API_KEY')}
-models = {
-    # OpenAI
-    "gpt-4": {"model": "openai/gpt-4-turbo-preview"},
-    "gpt-3.5": {"model": "openai/gpt-3.5-turbo"},
-    # Mistral
-    "mixtral-instruct": {
-        "model": "openai/_",
-        "api_base": dep("mixtral-8x7b-instruct-at-trtllm-newimg-lorxa5"),
-        **mcli_key,
-    },
-    # gemini
-    "gemini-1.0-pro": {"model": "gemini/gemini-1.0-pro-latest"} | gemini_block_none,
-    # Claude
-    "claude-3-haiku": {"model": "anthropic/claude-3-haiku-20240307"},
-    "claude-3-sonnet": {"model": "anthropic/claude-3-sonnet-20240229"},
-    "claude-3-opus": {"model": "anthropic/claude-3-opus-20240229"},
-    'llama-2-70b-chat-int8': {
-        "model": "openai/databricks-llama-2-70b-chat",
-        "api_base": 'https://e2-dogfood.staging.cloud.databricks.com/serving-endpoints',
-        **db_key,
-    },
-    "mixtral-8x22b": {
-        'api_base': 'https://77b7-164-152-107-143.ngrok-free.app/v1',
-        'api_key': 'key',
-        'ngrok': True,
-        'model': "mistralai/Mixtral-8x22B-Instruct-v0.1",
-    },
-}
+mcli_key = os.environ.get("MCLI_API_KEY")
+db_key = os.environ.get('DATABRICKS_API_KEY')
+oai_key = os.environ.get('OPENAI_API_KEY')
+
+models = {}
+# models = {
+#     # OpenAI
+#     "gpt-4": {"model": "openai/gpt-4-turbo-preview"},
+#     "gpt-3.5": {"model": "openai/gpt-3.5-turbo"},
+#     # Mistral
+#     "mixtral-instruct": {
+#         "model": "openai/_",
+#         "api_base": dep("mixtral-8x7b-instruct-at-trtllm-newimg-lorxa5"),
+#         **mcli_key,
+#     },
+#     # gemini
+#     "gemini-1.0-pro": {"model": "gemini/gemini-1.0-pro-latest"} | gemini_block_none,
+#     # Claude
+#     "claude-3-haiku": {"model": "anthropic/claude-3-haiku-20240307"},
+#     "claude-3-sonnet": {"model": "anthropic/claude-3-sonnet-20240229"},
+#     "claude-3-opus": {"model": "anthropic/claude-3-opus-20240229"},
+#     'llama-2-70b-chat-int8': {
+#         "model": "openai/databricks-llama-2-70b-chat",
+#         "api_base": 'https://e2-dogfood.staging.cloud.databricks.com/serving-endpoints',
+#         **db_key,
+#     },
+#     "mixtral-8x22b": {
+#         'api_base': 'https://77b7-164-152-107-143.ngrok-free.app/v1',
+#         'api_key': 'key',
+#         'ngrok': True,
+#         'model': "mistralai/Mixtral-8x22B-Instruct-v0.1",
+#     },
+# }
+
+# assumes an oai-compatible endpoint
+def api_generate(model,
+                 prompt,
+                 tenacity=False,
+                 api_base=None,
+                 api_key=None,
+                 **kwargs):
+
+    # handle api_keys etc
+    messages = [{"role": "user", "content": prompt}]
+    if api_key is None:
+        if api_base is None:
+            api_key = oai_key
+        elif 'mosaicml' in api_base:
+            api_key = mcli_key
+        else:
+            api_key = db_key
+    else:
+        api_key = os.environ.get(api_key)
+    kwargs = kwargs | {'model': model, 'api_base': api_base, 'api_key': api_key} | {"messages": messages}
+
+    if kwargs.get('api_base') and kwargs.get('temperature', None) == 0.0 and '.mosaicml.' in kwargs.get('api_base', []):
+        print('Setting top_k=1 for zero temperature')
+        kwargs['top_k'] = 1
+
+    client = OpenAI(base_url=kwargs['api_base'],
+                    api_key=kwargs['api_key'])
+
+    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+    def completion_with_backoff(**kwargs):
+        return client.chat.completions.create(**kwargs)
+
+    try:
+        if tenacity:
+            response = completion_with_backoff(model=model,
+                                            messages=messages,
+                                            temperature=kwargs['temperature'],
+                                            max_tokens=kwargs['max_tokens'],
+                                            )
+            response_msg = response.choices[0].message.content
+        else:
+            response = client.chat.completions.create(model=model,
+                                                      messages=messages,
+                                                      temperature=kwargs['temperature'],
+                                                      max_tokens=kwargs['max_tokens'],
+                                                      )
+            response_msg = response.choices[0].message.content
+    except Exception as e:
+        raise ValueError(f"Error while querying model endpoint: {e}")
+
+    return response_msg
 
 
-def api_generate(model, prompt, tenacity=False, api_base=None, api_key=None, **kwargs):
+# @deprecated. using old litellm code to be compatible with several kinds of endpoints.
+def api_generate_old(model, prompt, tenacity=False, api_base=None, api_key=None, **kwargs):
     messages = [{"role": "user", "content": prompt}]
     if api_base is None:
         kwargs = kwargs | models[model] | {"messages": messages}
@@ -97,7 +155,7 @@ def api_generate(model, prompt, tenacity=False, api_base=None, api_key=None, **k
         return completion(**kwargs)
     if tenacity:
         helper = retry(wait=wait_random_exponential(min=60, max=600), stop=stop_after_attempt(6))(helper)
-    
+
     if kwargs.get('ngrok'):
         from openai import OpenAI
         client = OpenAI(
@@ -117,6 +175,7 @@ def api_generate(model, prompt, tenacity=False, api_base=None, api_key=None, **k
 
     # response = completion(**kwargs)
     return response.choices[0].message.content
+
 
 # testing the api_generate function
 def test_model(model="mixtral-instruct", prompt="twinkle twinkle little star", max_tokens=100, system=None):
