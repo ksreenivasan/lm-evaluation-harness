@@ -107,6 +107,10 @@ def api_generate(model,
         print('Setting top_k=1 for zero temperature')
         kwargs['top_k'] = 1
 
+    # for openai models
+    if kwargs.get('api_base') == "":
+        kwargs['api_base'] = None
+
     client = OpenAI(base_url=kwargs['api_base'],
                     api_key=kwargs['api_key'])
 
